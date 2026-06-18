@@ -32,6 +32,8 @@ class WinRegistryParser(interface.FileObjectParser):
 
     _CONTROL_SET_PREFIX = ("HKEY_LOCAL_MACHINE\\System\\ControlSet").lower()
 
+    _MAXIMUM_DEPTH = 255
+
     _NORMALIZED_CONTROL_SET_PREFIX = (
         "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet"
     ).lower()
@@ -210,14 +212,21 @@ class WinRegistryParser(interface.FileObjectParser):
                 parser_mediator, win_registry, registry_key, matching_plugin
             )
 
-    def _ParseRecurseKeys(self, parser_mediator, win_registry, registry_key):
+    def _ParseRecurseKeys(self, parser_mediator, win_registry, registry_key, depth=0):
         """Parses the Registry keys recursively.
 
         Args:
           parser_mediator (ParserMediator): parser mediator.
           win_registry (dfwinreg.WinRegistry): Windows Registry.
           registry_key (dfwinreg.WinRegistryKey): Windows Registry key.
+          depth (Optional[int]): current recursion depth.
         """
+        if depth >= self._MAXIMUM_DEPTH:
+            parser_mediator.ProduceExtractionWarning(
+                f"maximum recursion depth reached in key: {registry_key.path:s}"
+            )
+            return
+
         # Note that we do not use dfWinReg generators here to be able to catch
         # exceptions raised by corrupt files.
 
@@ -229,7 +238,9 @@ class WinRegistryParser(interface.FileObjectParser):
 
             try:
                 subkey = registry_key.GetSubkeyByIndex(subkey_index)
-                self._ParseRecurseKeys(parser_mediator, win_registry, subkey)
+                self._ParseRecurseKeys(
+                    parser_mediator, win_registry, subkey, depth=depth + 1
+                )
 
             except OSError as exception:
                 parser_mediator.ProduceExtractionWarning(
