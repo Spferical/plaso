@@ -22,6 +22,10 @@ class UtmpEventData(events.EventData):
       offset (int): offset of the utmp record relative to the start of the file,
           from which the event data was extracted.
       pid (int): process identifier (PID).
+      session_length_seconds (int): The duration of the session in seconds (if
+          applicable).
+      session_length_nanos (int): Additional nanoseconds for the session length
+          (if applicable).
       terminal_identifier (int): inittab identifier.
       terminal (str): type of terminal.
       type (int): type of login.
@@ -37,8 +41,12 @@ class UtmpEventData(events.EventData):
         self.exit_status = None
         self.hostname = None
         self.ip_address = None
+        self.login_time = None
+        self.logout_time = None
         self.offset = None
         self.pid = None
+        self.session_length_seconds = None
+        self.session_length_nanos = None
         self.terminal_identifier = None
         self.terminal = None
         self.type = None
@@ -59,6 +67,8 @@ class UtmpParser(interface.FileObjectParser, dtfabric_helper.DtFabricHelper):
     _SUPPORTED_TYPES = frozenset(range(0, 10))
 
     _INIT_PROCESS_TYPE = 5
+    _LOGIN_PROCESS_TYPE = 6
+    _USER_PROCESS_TYPE = 7
     _DEAD_PROCESS_TYPE = 8
 
     def _ReadEntry(self, parser_mediator, file_object, file_offset):
@@ -124,7 +134,7 @@ class UtmpParser(interface.FileObjectParser, dtfabric_helper.DtFabricHelper):
             warning_strings.append("unable to decode hostname string")
             hostname = None
 
-        if not hostname or hostname == ":0":
+        if not hostname and entry.type != self._DEAD_PROCESS_TYPE:
             hostname = "localhost"
 
         if entry.ip_address[4:] == self._EMPTY_IP_ADDRESS[4:]:
@@ -165,6 +175,7 @@ class UtmpParser(interface.FileObjectParser, dtfabric_helper.DtFabricHelper):
           WrongParser: when the file cannot be parsed.
         """
         file_offset = 0
+        login_entry = {}
 
         try:
             event_data, warning_strings = self._ReadEntry(
@@ -194,9 +205,7 @@ class UtmpParser(interface.FileObjectParser, dtfabric_helper.DtFabricHelper):
                 f"Unable to parse first utmp entry with error: {all_warnings:s}"
             )
 
-        parser_mediator.ProduceEventData(event_data)
-
-        file_offset = file_object.tell()
+        file_offset = 0
         file_size = file_object.get_size()
 
         while file_offset < file_size:
@@ -211,12 +220,46 @@ class UtmpParser(interface.FileObjectParser, dtfabric_helper.DtFabricHelper):
                 # Note that the utmp file can contain trailing data.
                 break
 
-            parser_mediator.ProduceEventData(event_data)
+            if event_data.type in (self._LOGIN_PROCESS_TYPE, self._USER_PROCESS_TYPE):
+                event_data.login_time = event_data.written_time
+                login_entry[event_data.terminal] = event_data
+
+            elif event_data.type == self._DEAD_PROCESS_TYPE:
+                if event_data.terminal in login_entry:
+                    login_event = login_entry[event_data.terminal]
+                    session_len = (
+                        event_data.written_time.timestamp
+                        - login_event.written_time.timestamp
+                    )
+                    event_data.session_length_seconds = session_len // 1000000
+                    event_data.session_length_nanos = session_len % 1000000
+                    event_data.login_time = login_event.login_time
+                    event_data.logout_time = event_data.written_time
+                    event_data.username = login_event.username
+
+                    login_event.session_length_seconds = (
+                        event_data.session_length_seconds
+                    )
+                    login_event.session_length_nanos = (
+                        event_data.session_length_nanos
+                    )
+                    login_event.logout_time = event_data.logout_time
+
+                    parser_mediator.ProduceEventData(login_event)
+                    login_entry.pop(event_data.terminal)
+
+                parser_mediator.ProduceEventData(event_data)
+
+            else:
+                parser_mediator.ProduceEventData(event_data)
 
             for warning_string in warning_strings:
                 parser_mediator.ProduceExtractionWarning(warning_string)
 
             file_offset = file_object.tell()
+
+        for entry in login_entry.values():
+            parser_mediator.ProduceEventData(entry)
 
 
 manager.ParsersManager.RegisterParser(UtmpParser)
