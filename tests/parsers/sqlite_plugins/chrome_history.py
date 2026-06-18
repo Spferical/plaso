@@ -158,6 +158,7 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
             "typed_count": 0,
             "visit_count": 1,
             "url": expected_url,
+            "browser_name": "Google Chrome",
         }
 
         event_data = storage_writer.GetAttributeContainerByIndex("event_data", 0)
@@ -175,6 +176,7 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
                 "https://raw.githubusercontent.com/log2timeline/l2tbinaries/master/"
                 "win32/plaso-20171231.1.win32.msi"
             ),
+            "browser_name": "Google Chrome",
         }
 
         event_data = storage_writer.GetAttributeContainerByIndex("event_data", 1)
@@ -215,6 +217,7 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
             "typed_count": 0,
             "visit_count": 1,
             "url": expected_url,
+            "browser_name": "Google Chrome",
         }
 
         event_data = storage_writer.GetAttributeContainerByIndex("event_data", 0)
@@ -232,6 +235,7 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
                 "https://raw.githubusercontent.com/log2timeline/l2tbinaries/master/"
                 "win32/plaso-20171231.1.win32.msi"
             ),
+            "browser_name": "Google Chrome",
         }
 
         event_data = storage_writer.GetAttributeContainerByIndex("event_data", 1)
@@ -275,6 +279,7 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
             "typed_count": 0,
             "visit_count": 1,
             "url": expected_url,
+            "browser_name": "Google Chrome",
         }
 
         event_data = storage_writer.GetAttributeContainerByIndex("event_data", 0)
@@ -292,10 +297,21 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
                 "https://raw.githubusercontent.com/log2timeline/l2tbinaries/master/"
                 "win32/plaso-20171231.1.win32.msi"
             ),
+            "browser_name": "Google Chrome",
         }
 
         event_data = storage_writer.GetAttributeContainerByIndex("event_data", 1)
         self.CheckEventData(event_data, expected_event_values)
+
+    def testProcess_microsoftEdge(self):
+        """Verifies that Plaso can tell the difference between Chrome and Edge."""
+        plugin = chrome_history.GoogleChrome27HistoryPlugin()
+        storage_writer = self._ParseDatabaseFileWithPlugin(
+            ["edge_history", "History-135.0.3179.73"], plugin
+        )
+
+        event = storage_writer.GetAttributeContainerByIndex("event_data", 0)
+        self.assertEqual(event.browser_name, "Microsoft Edge")
 
 
 if __name__ == "__main__":

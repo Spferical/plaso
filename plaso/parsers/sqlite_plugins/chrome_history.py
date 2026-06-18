@@ -29,6 +29,7 @@ class ChromeHistoryFileDownloadedEventData(events.EventData):
       state (int): state of the download, such as finished or cancelled.
       total_bytes (int): total number of bytes to download.
       url (str): URL of the downloaded file.
+      browser_name (str): name of the browser.
     """
 
     DATA_TYPE = "chrome:history:file_downloaded"
@@ -48,6 +49,7 @@ class ChromeHistoryFileDownloadedEventData(events.EventData):
         self.state = None
         self.total_bytes = None
         self.url = None
+        self.browser_name = None
 
 
 class ChromeHistoryPageVisitedEventData(events.EventData):
@@ -68,6 +70,7 @@ class ChromeHistoryPageVisitedEventData(events.EventData):
       url_hidden (bool): True if the URL is hidden.
       visit_count (int): number of times the user has navigated to this page.
       visit_source (int): source of the page visit.
+      browser_name (str): name of the browser.
     """
 
     DATA_TYPE = "chrome:history:page_visited"
@@ -86,6 +89,7 @@ class ChromeHistoryPageVisitedEventData(events.EventData):
         self.url_hidden = None
         self.visit_count = None
         self.visit_source = None
+        self.browser_name = None
 
 
 class BaseGoogleChromeHistoryPlugin(interface.SQLitePlugin):
@@ -200,6 +204,23 @@ class BaseGoogleChromeHistoryPlugin(interface.SQLitePlugin):
 
         return None
 
+    def _DetermineBrowserName(self, database):
+        """Determines the browser name based on database characteristics.
+
+        Args:
+          database (SQLiteDatabase): database.
+
+        Returns:
+          str: browser name.
+        """
+        browser_name = "Google Chrome"
+
+        if database:
+            if "edge_visits" in database.tables:
+                browser_name = "Microsoft Edge"
+
+        return browser_name
+
     def _ParseLastVisitedRow(
         self, parser_mediator, query, row, cache=None, database=None, **unused_kwargs
     ):
@@ -238,6 +259,7 @@ class BaseGoogleChromeHistoryPlugin(interface.SQLitePlugin):
         event_data.visit_source = self._GetVisitSource(
             visit_identifier, cache, database
         )
+        event_data.browser_name = self._DetermineBrowserName(database)
 
         parser_mediator.ProduceEventData(event_data)
 
@@ -483,7 +505,9 @@ class GoogleChrome8HistoryPlugin(BaseGoogleChromeHistoryPlugin):
 
     SCHEMAS = [_SCHEMA_8, _SCHEMA_16, _SCHEMA_19, _SCHEMA_20]
 
-    def _ParseFileDownloadedRow(self, parser_mediator, query, row, **unused_kwargs):
+    def _ParseFileDownloadedRow(
+        self, parser_mediator, query, row, database=None, **unused_kwargs
+    ):
         """Parses a file downloaded row.
 
         Args:
@@ -491,6 +515,7 @@ class GoogleChrome8HistoryPlugin(BaseGoogleChromeHistoryPlugin):
               and other components, such as storage and dfVFS.
           query (str): query that created the row.
           row (sqlite3.Row): row.
+          database (Optional[SQLiteDatabase]): database.
         """
         query_hash = hash(query)
 
@@ -505,6 +530,7 @@ class GoogleChrome8HistoryPlugin(BaseGoogleChromeHistoryPlugin):
         event_data.state = self._GetRowValue(query_hash, row, "state")
         event_data.total_bytes = self._GetRowValue(query_hash, row, "total_bytes")
         event_data.url = self._GetRowValue(query_hash, row, "url")
+        event_data.browser_name = self._DetermineBrowserName(database)
 
         parser_mediator.ProduceEventData(event_data)
 
@@ -1259,7 +1285,9 @@ class GoogleChrome27HistoryPlugin(BaseGoogleChromeHistoryPlugin):
         _SCHEMA_67_3,
     ]
 
-    def _ParseFileDownloadedRow(self, parser_mediator, query, row, **unused_kwargs):
+    def _ParseFileDownloadedRow(
+        self, parser_mediator, query, row, database=None, **unused_kwargs
+    ):
         """Parses a file downloaded row.
 
         Args:
@@ -1267,6 +1295,7 @@ class GoogleChrome27HistoryPlugin(BaseGoogleChromeHistoryPlugin):
               and other components, such as storage and dfVFS.
           query (str): query that created the row.
           row (sqlite3.Row): row.
+          database (Optional[SQLiteDatabase]): database.
         """
         query_hash = hash(query)
 
@@ -1289,6 +1318,7 @@ class GoogleChrome27HistoryPlugin(BaseGoogleChromeHistoryPlugin):
         event_data.state = self._GetRowValue(query_hash, row, "state")
         event_data.total_bytes = self._GetRowValue(query_hash, row, "total_bytes")
         event_data.url = self._GetRowValue(query_hash, row, "url")
+        event_data.browser_name = self._DetermineBrowserName(database)
 
         parser_mediator.ProduceEventData(event_data)
 
