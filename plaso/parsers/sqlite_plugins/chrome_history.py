@@ -1,5 +1,7 @@
 """SQLite parser plugin for Google Chrome history database files."""
 
+import sqlite3
+
 from dfdatetime import posix_time as dfdatetime_posix_time
 from dfdatetime import webkit_time as dfdatetime_webkit_time
 
@@ -218,6 +220,17 @@ class BaseGoogleChromeHistoryPlugin(interface.SQLitePlugin):
         if database:
             if "edge_visits" in database.tables:
                 browser_name = "Microsoft Edge"
+            elif "meta" in database.tables:
+                try:
+                    result_set = database.Query(
+                        'SELECT value FROM meta WHERE key = '
+                        '\'opera_current_history_version\';')
+                    row = result_set.fetchone()
+                    if row:
+                        browser_name = "Opera"
+                except sqlite3.DatabaseError:
+                    # If query fails for some reason, fallback to default
+                    pass
 
         return browser_name
 

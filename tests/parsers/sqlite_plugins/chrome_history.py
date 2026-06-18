@@ -313,6 +313,16 @@ class GoogleChrome27HistoryPluginTest(test_lib.SQLitePluginTestCase):
         event = storage_writer.GetAttributeContainerByIndex("event_data", 0)
         self.assertEqual(event.browser_name, "Microsoft Edge")
 
+    def testProcess_Opera(self):
+        """Verifies that Plaso can tell the difference between Chrome and Opera."""
+        plugin = chrome_history.GoogleChrome27HistoryPlugin()
+        storage_writer = self._ParseDatabaseFileWithPlugin(
+            ["edge_history", "Opera_History"], plugin
+        )
+
+        event = storage_writer.GetAttributeContainerByIndex("event_data", 0)
+        self.assertEqual(event.browser_name, "Opera")
+
 
 if __name__ == "__main__":
     unittest.main()
